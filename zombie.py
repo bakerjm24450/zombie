@@ -97,27 +97,12 @@ def main():
 
     rightArm = BodyPart(name='Right Arm', 
                        tag=array.array('B', [167, 75, 126, 242]),
-                       muxAddr=0x70, muxChannel=1, 
-                       motorAddr=0x60, motorId=4)
+                       muxAddr=0x74, muxChannel=7, 
+                       motorAddr=0x62, motorId=1)
 
-    leftArm = BodyPart(name='Left Arm', 
-                       tag=array.array('B', [55, 167, 128, 242]),
-                       muxAddr=0x70, muxChannel=0, 
-                       motorAddr=0x60, motorId=1)
-
-    leftPrevState = False
     rightPrevState = False
 
     while True:
-        state = leftArm.update()
-
-        if state != leftPrevState:
-            leftPrevState = state
-            if state:
-                print('Found the left arm')
-            else:
-                print("It's only a flesh wound")
-
         state = rightArm.update()
 
         if state != rightPrevState:
