@@ -5,27 +5,18 @@ import array
 import time
 import atexit
 import csv
-import multiprocessing
 from Adafruit_MotorHAT import Adafruit_MotorHAT, Adafruit_DCMotor
 import nfci2c
 import body_part
 import nfc_scanner
-from multiprocessing import Lock
 
 def main():
-    """Read the config file and then start the two processes -- one to
-    continuously scan the NFC sensors and one to control the magnets on the
-    different body parts. The two processes communicate through a set of
-    queues.
+    """Read the config file and build the different body parts
     """
-    i2cLock = Lock()
+
+    motorControllers  = dict()     # system has more than one motor controller
     
-    busAddr = 1        # which I2C bus 
-    muxAddr = 0x74     # I2C addr of I2C mux
-    queues = dict()    # one queue per body part
-    motorControllers  = dict()     # system has more than one
-    
-    parts = list()
+    bodyParts = list()
     
     print('Reading the config file')
     with open('zombie.config') as configfile:
@@ -36,10 +27,6 @@ def main():
             
             # parse the tag to get a byte array
             tag = array.array('B', [int(x) for x in row['tag'].split(' ')])
-            
-            # make a new queue to talk to this body part
-            q = multiprocessing.Queue()
-            queues[int(row['channel'])] = q
             
             # get magnets, adding motor controllers to dict, if needed
             magnet1 = None
@@ -66,35 +53,39 @@ def main():
             if magnet2 is not None:
                 magnets.append(magnet2)
                 
-            # make a dict of this body part's info
-            part = dict()
-            part['name'] = name
-            part['tag'] = tag
-            part['q'] = q
-            part['magnets'] = magnets
+            # create this body part
+            part = body_part.BodyPart(name, tag, magnets, channel)
             
             # add to list of body parts
-            parts.append(part)
+            bodyParts.append(part)
             
-    # create the scanner process
-    print('Starting the scanner process')
-    scannerProc = multiprocessing.Process(target=nfc_scanner.nfc_scanner,
-                                          args=(i2cLock, busAddr, muxAddr, queues))
-    scannerProc.daemon = True
-    scannerProc.start()
+    print('Initialized')
     
-    # create the body part process
-    print('Starting the body parts process')
-    bodyPartProc = multiprocessing.Process(target=body_part.body_part,
-                                           args=[i2cLock, parts])
-    
-    bodyPartProc.daemon = True
-    bodyPartProc.start()
-
+    # this is our  main loop -- wait for all body parts, then drop them and repeat
     while True:
-        time.sleep(60.0)
+        # assume we've found all the parts
+        allFound = True
+        
+        # update all the parts and see if we've found all of them
+        for part in bodyParts:
+            allFound &= part.update()
+                
+        # are  they all there?
+        if allFound:
+            print('Found all parts\n')
+            
+            # drop all  the parts
+            for part in  bodyParts:
+                time.sleep(1.0)
+                part.drop()
+                
+        
  
 #    nfc_scanner(busAddr, muxAddr, queues)
 if __name__ == '__main__':
     main()
+
+
+
+
 
