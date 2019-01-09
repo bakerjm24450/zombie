@@ -6,24 +6,53 @@ import time
 import atexit
 import csv
 from Adafruit_MotorHAT import Adafruit_MotorHAT, Adafruit_DCMotor
-import nfci2c
 import body_part
-import nfc_scanner
+import RPi.GPIO as GPIO
 
-def main():
+# list of body parts
+bodyParts = list()
+
+def wakeup():
+    """Wakeup the Trinket microcontrollers using the reset signals
+    """
+    
+    # set pins as outputs
+    resetPin1 = 25
+    resetPin2 = 10
+    
+    GPIO.setmode(GPIO.BCM)
+    
+    GPIO.setup(resetPin1, GPIO.OUT)
+    GPIO.setup(resetPin2, GPIO.OUT)
+    
+    # set reset signals low
+    GPIO.output(resetPin1, GPIO.LOW)
+    GPIO.output(resetPin2, GPIO.LOW)
+    
+    # wait a bit
+    time.sleep(0.5)
+    
+    # set them high again
+    GPIO.output(resetPin1, GPIO.HIGH)
+    GPIO.output(resetPin2, GPIO.HIGH)
+    
+    # set the pins to inputs with a pull-up
+    GPIO.setup(resetPin1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(resetPin2, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    
+    
+def config():
     """Read the config file and build the different body parts
     """
 
     motorControllers  = dict()     # system has more than one motor controller
     
-    bodyParts = list()
-    
     print('Reading the config file')
-    with open('zombie.config') as configfile:
+    with open('/etc/zombie.conf') as configfile:
         reader = csv.DictReader(configfile)
         for row in reader:            
             name = str(row['name'])
-            channel = int(row['channel'])
+            pin = int(row['pin'])
             
             # parse the tag to get a byte array
             tag = array.array('B', [int(x) for x in row['tag'].split(' ')])
@@ -54,12 +83,20 @@ def main():
                 magnets.append(magnet2)
                 
             # create this body part
-            part = body_part.BodyPart(name, tag, magnets, channel)
+            part = body_part.BodyPart(name, pin, magnets, tag)
             
             # add to list of body parts
             bodyParts.append(part)
             
     print('Initialized')
+    
+    
+def main():
+    # wakeup the microcontrollers
+    wakeup()
+    
+    # read the config file
+    config()
     
     # this is our  main loop -- wait for all body parts, then drop them and repeat
     while True:
