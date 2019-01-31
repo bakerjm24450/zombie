@@ -8,10 +8,115 @@ import csv
 from Adafruit_MotorHAT import Adafruit_MotorHAT, Adafruit_DCMotor
 import body_part
 import RPi.GPIO as GPIO
+from pygame import mixer
+import os
+import paho.mqtt.client as mqtt
+from enum import Enum
+import config
+from threading import Timer
+import requests
+
+class ZombieState(Enum):
+    """State of the zombie"""
+    RESET = 0
+    LOCKED = 1
+    FOUND_ALL = 2
+    DROP_PARTS = 3
+    UNLOCK = 4
+    PAUSE = 5
+    
+# path to source code directory
+path = "/home/pi/src/zombie/"
 
 # list of body parts
 bodyParts = list()
 
+# current state
+state = ZombieState.RESET
+
+# mqtt client
+client = mqtt.Client()
+
+# timer to restart
+restartTimer = None
+
+def on_connect(client, userdata, flags, rc):
+    """Callback for connecting to mqtt broker
+    """
+    print("Connected to mqtt broker")
+    
+    # we subscribe here so that we automatically
+    # re-subscribe on re-connection
+    client.subscribe("zombie")
+    
+def on_message(client, userdata, msg):
+    """Callback for when we receive a message
+    """
+    global state
+    
+    command = str(msg.payload, encoding='utf-8')
+    
+    if command == "reset":
+        state = ZombieState.RESET
+    elif command == "unlock":
+        state = ZombieState.DROP_PARTS
+        
+
+def magnetTimer_callback():
+    """Called when magnets left on too long
+    """
+    global state
+    
+    print("Timer expired")
+    state = ZombieState.DROP_PARTS
+               
+def restartTimer_callback():
+    """Called after unlock, to restart the prop
+    """
+    global state
+    
+    print("Restarting")
+    state = ZombieState.RESET
+    
+def init():
+    """System level initialization.
+        - create the directory /tmp/zombie
+        - delete any existing files in /tmp/zombie
+        - connect to mqtt broker
+        - set up mqtt callbacks
+    """
+    global client
+    
+    # create the directory /tmp/zombie
+    try:
+        os.mkdir("/tmp/zombie/")
+        os.chmod("/tmp/zombie/", 0o777)
+        
+        # delete all files in directory
+        it = os.scandir("/tmp/zombie/")
+        for entry in it:
+            if entry.is_file():
+                os.remove(entry.path)
+            elif entry.is_dir():
+                os.rmdir(entry.path)
+    except:
+        pass
+                    
+    # connect to the mqtt broker
+    client.on_connect = on_connect
+    client.on_message = on_message
+    
+    client.connect("localhost")
+    client.loop_start()
+    
+    # timer for turning off the magnets after 2 hours
+    config.magnetTimer = Timer(7200.0, magnetTimer_callback)
+    
+    # clear the web database
+    config.session.get('http://127.0.0.1:5000/init')
+    
+
+    
 def wakeup():
     """Wakeup the Trinket microcontrollers using the reset signals
     """
@@ -30,25 +135,38 @@ def wakeup():
     GPIO.output(resetPin2, GPIO.LOW)
     
     # wait a bit
-    time.sleep(0.5)
+    time.sleep(0.25)
     
     # set them high again
     GPIO.output(resetPin1, GPIO.HIGH)
     GPIO.output(resetPin2, GPIO.HIGH)
     
+    # wait another bit
+    time.sleep(0.25)
+    
     # set the pins to inputs with a pull-up
     GPIO.setup(resetPin1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(resetPin2, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     
+    # initialize sound device
+    mixer.init()
     
-def config():
+def configZombie():
     """Read the config file and build the different body parts
     """
+    global bodyParts
+    global restartTimer
+    
+    # stop the restart timer, if running
+    if (restartTimer is not None) and (restartTimer.is_alive()):
+        restartTimer.cancel()
 
     motorControllers  = dict()     # system has more than one motor controller
     
+    bodyParts.clear()
+    
     print('Reading the config file')
-    with open('/etc/zombie.conf') as configfile:
+    with open(path + 'zombie.conf') as configfile:
         reader = csv.DictReader(configfile)
         for row in reader:            
             name = str(row['name'])
@@ -57,33 +175,52 @@ def config():
             # parse the tag to get a byte array
             tag = array.array('B', [int(x) for x in row['tag'].split(' ')])
             
+            # get the sound file
+            soundfile = path + 'sounds/' + str(row['soundfile'])
+            
             # get magnets, adding motor controllers to dict, if needed
+            magnets = list()
             magnet1 = None
             magnet2 = None
             if row['motorAddr1'] is not None:
                 motorAddr1 = int(row['motorAddr1'])
+                
+                # add motor controller chip to dict if needed
                 if not motorAddr1 in motorControllers:
-                    motorControllers[motorAddr1] = Adafruit_MotorHAT(addr=motorAddr1, freq=100)
+                    motorControllers[motorAddr1] = Adafruit_MotorHAT(addr=motorAddr1,
+                                                                     freq=100)
+                
+                # get channel on this motor controller
                 motorChannel1 = int(row['motorChannel1'])
                 magnet1 = motorControllers[motorAddr1].getMotor(motorChannel1)
                 
+                # make sure it's off to start
+                magnet1.run(Adafruit_MotorHAT.RELEASE)
+                
+                # add to list of magnets for this body part
+                magnets.append(magnet1)
+
+                
             if row['motorAddr2'] is not None:
                 motorAddr2 = int(row['motorAddr2'])
+                
+                # add motor controller chip to dict if needed
                 if not motorAddr2 in motorControllers:
-                    motorControllers[motorAddr2] = Adafruit_MotorHAT(addr=motorAddr2, freq=100)
+                    motorControllers[motorAddr2] = Adafruit_MotorHAT(addr=motorAddr2,
+                                                                     freq=100)
+                    
+                # get channel on this motor controller
                 motorChannel2 = int(row['motorChannel2'])
                 magnet2 = motorControllers[motorAddr2].getMotor(motorChannel2)
                 
-            # build a list of motors (magnets)
-            magnets = list()
-            if magnet1 is not None:
-                magnets.append(magnet1)
-            
-            if magnet2 is not None:
-                magnets.append(magnet2)
+                # make sure it's off to start
+                magnet2.run(Adafruit_MotorHAT.RELEASE)
                 
+                # add to list of magnets for this body part
+                magnets.append(magnet2)
+                                
             # create this body part
-            part = body_part.BodyPart(name, pin, magnets, tag)
+            part = body_part.BodyPart(name, pin, magnets, tag, soundfile)
             
             # add to list of body parts
             bodyParts.append(part)
@@ -92,30 +229,104 @@ def config():
     
     
 def main():
-    # wakeup the microcontrollers
-    wakeup()
+    global state
+    global bodyParts
+    global restartTimer
     
-    # read the config file
-    config()
+    init()
     
-    # this is our  main loop -- wait for all body parts, then drop them and repeat
-    while True:
-        # assume we've found all the parts
-        allFound = True
+    # try-finally block to handle clean up
+    try:
+        state = ZombieState.RESET
         
-        # update all the parts and see if we've found all of them
-        for part in bodyParts:
-            allFound &= part.update()
+        # infinite loop
+        while True:
+            # state machine
+            if state == ZombieState.RESET:
+                # wakeup the microcontrollers
+                wakeup()
+    
+                # read the config file
+                configZombie()
                 
-        # are  they all there?
-        if allFound:
-            print('Found all parts\n')
-            
-            # drop all  the parts
-            for part in  bodyParts:
-                time.sleep(1.0)
-                part.drop()
+                # lock the lock
+                client.publish(topic="zombielock", payload="lock")
                 
+                # start looking for body parts
+                print("Waiting for body parts")
+                state = ZombieState.LOCKED
+                
+            elif state == ZombieState.LOCKED:
+                # assume we've found all the parts
+                allFound = True
+        
+                # update all the parts and see if we've found all of them
+                for part in bodyParts:
+                    allFound &= part.update()
+                
+                # are  they all there?
+                if allFound:
+                    state = ZombieState.FOUND_ALL
+                    
+            elif state == ZombieState.FOUND_ALL:
+                print("Found all parts")
+                
+                # cancel the timer if needed
+                if config.magnetTimer.is_alive():
+                    config.magnetTimer.cancel()
+                    
+                # wait a little bit
+                time.sleep(5.0)
+                
+                # drop all the parts
+                state = ZombieState.DROP_PARTS
+                
+            elif state == ZombieState.DROP_PARTS:
+                print("Turning off magnets")
+                
+                # drop all  the parts
+                for part in  bodyParts:
+                   part.drop()
+                   time.sleep(1.0)
+                   
+                # unlock everything next
+                state = ZombieState.UNLOCK
+                
+            elif state == ZombieState.UNLOCK:
+                print("Unlocking")
+                
+                # send msg to unlock
+                client.publish(topic="zombielock", payload="unlock")
+       
+                # restart the magnet timer
+                config.magnetTimer = Timer(7200.0, magnetTimer_callback)
+                
+                # start the timer to reset the prop
+                restartTimer = Timer(300.0, restartTimer_callback)
+                restartTimer.start()
+                
+                # wait until reset
+                state = ZombieState.PAUSE
+                
+            elif state == ZombieState.PAUSE:
+                time.sleep(1)
+                
+            else:
+                # unknown state, so reset
+                state = ZombieState.RESET
+                
+    finally:
+        # clean everything up
+        print("Exiting, cleaning up")
+        GPIO.cleanup()
+        mixer.quit()
+        client.loop_stop()
+        client.disconnect()
+        config.magnetTimer.cancel()
+        if restartTimer is not None:
+            restartTimer.cancel()
+        
+        
         
  
 #    nfc_scanner(busAddr, muxAddr, queues)
