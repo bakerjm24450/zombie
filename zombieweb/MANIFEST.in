@@ -1,0 +1,4 @@
+include zombieweb/schema.sql
+graft zombieweb/static
+graft zombieweb/templates
+global-exclude *.pyc

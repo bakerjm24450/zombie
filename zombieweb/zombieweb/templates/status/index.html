@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block header %}
+    <h1>{% block title %}Zombie{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="w3-row-padding">
+        <div class="w3-col w3-container l3 m3 s12 w3-center">
+             <form action="/unlock" method="post">
+                <p>
+                    <button type="submit" class="w3-button w3-round w3-pale-green w3-border w3-border-green w3-hover-green">
+                    Unlock
+                    </button>
+                </p>
+            </form>
+            <form action="/reset" method="post">
+                <p>
+                    <button type="submit" class="w3-button w3-round w3-pale-red w3-border w3-border-red w3-hover-red">
+                    Reset
+                    </button>
+                </p>
+            </form>
+        </div>
+        <div class="w3-col w3-container l6 m6 s12">
+            <table class="w3-table-all">
+                <tr>
+                    <th>Body Part</th>
+                    <th>Status</th>
+                </tr>
+                {% for part in parts %}
+                <tr>
+                    <td>{{ part['name'] }}</td>
+                    <td>{{ part['status'] }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+{% endblock %}
