@@ -50,7 +50,7 @@ class BodyPart(object):
 
         # update  the web server
         payload = {'name' :  self.name, 'status' : 0}
-        config.session.post('http://127.0.0.1:5000/insert', data=payload)
+        config.session.post('http://127.0.0.1/insert', data=payload)
         
     def close(self):
         """Turn off the magnets """
@@ -59,7 +59,7 @@ class BodyPart(object):
             
         # update web page
         payload = {'name' :  self.name, 'status' : 0}
-        config.session.post('http://127.0.0.1:5000/update', data=payload)
+        config.session.post('http://127.0.0.1/update', data=payload)
         
             
     def foundMyTag(self):
@@ -67,7 +67,7 @@ class BodyPart(object):
         """
         # turn on the magnets
         for m in self.magnets:
-            m.setSpeed(160)
+            m.setSpeed(180)
             m.run(Adafruit_MotorHAT.FORWARD)
                     
         # play a sound
@@ -76,7 +76,7 @@ class BodyPart(object):
         
         # update  the web server
         payload = {'name' :  self.name, 'status' : 1}
-        config.session.post('http://127.0.0.1:5000/update', data=payload)
+        config.session.post('http://127.0.0.1/update', data=payload)
         
         # start the timer if it's not already running
         if not config.magnetTimer.is_alive():
@@ -98,7 +98,7 @@ class BodyPart(object):
         
         # update  the web server
         payload = {'name' :  self.name, 'status' : 0}
-        config.session.post('http://127.0.0.1:5000/update', data=payload)
+        config.session.post('http://127.0.0.1/update', data=payload)
         
         # update state
         self.state = BodyPartState.IDLE

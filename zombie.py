@@ -113,7 +113,7 @@ def init():
     config.magnetTimer = Timer(7200.0, magnetTimer_callback)
     
     # clear the web database
-    config.session.get('http://127.0.0.1:5000/init')
+    config.session.get('http://127.0.0.1/init')
     
 
     
