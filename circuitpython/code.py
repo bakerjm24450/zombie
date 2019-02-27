@@ -26,10 +26,11 @@ try:
     # NFC tag we're looking for
     # tag = bytes([167, 75, 126, 242])      # head
     # tag = bytes([151, 207, 126, 242])       # right leg
-    tag = bytes([7, 76, 126, 242])        # left leg
+    # tag = bytes([7, 76, 126, 242])        # left leg
     # tag = bytes([55, 167, 128, 242])      # right arm
     # tag = bytes([71, 208, 126, 242])      # left arm
-    # tag = bytes([231, 206, 126, 242])     # chest
+    tag = bytes([231, 206, 126, 242])     # chest
+    extra_tag = bytes([247, 71, 128, 242])  # spare tag for testing
 
     # I2C connection:
     i2c = busio.I2C(board.SCL, board.SDA)
@@ -54,7 +55,7 @@ try:
         uid = pn532.read_passive_target(timeout=0.5)
 
         # Is it the one  we want?
-        if uid == tag:
+        if uid == tag or uid == extra_tag:
             led.value = True
             pin.value = True
             print('Found card with UID:', [hex(i) for i in uid])
@@ -62,5 +63,6 @@ try:
         else:
             led.value = False
             pin.value = False
+
 except Exception:
     supervisor.reload()
