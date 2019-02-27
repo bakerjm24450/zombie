@@ -28,8 +28,11 @@ class ZombieState(Enum):
 # path to source code directory
 path = "/home/pi/src/zombie/"
 
-# list of body parts
-bodyParts = list()
+# dict of body parts, indexed by input pin
+bodyParts = {}
+
+# count of number of body parts we've found
+numPartsFound = 0
 
 # current state
 state = ZombieState.RESET
@@ -77,6 +80,33 @@ def restartTimer_callback():
     
     print("Restarting")
     state = ZombieState.RESET
+    
+def bodyPart_callback(channel):
+    """Callback for GPIO pin, called whenever a
+    body part is found or removed.
+    channel = GPIO channel
+    """
+    global numPartsFound
+    
+    print('body part ', channel)
+    
+    # found or removed?
+    if GPIO.input(channel):
+        # rising edge, make sure we haven't already found this one
+        if not bodyParts[channel].isFound():
+            bodyParts[channel].foundMyTag()
+        
+            numPartsFound = numPartsFound + 1
+        
+    else:
+        # falling edge, so check if we already removed this one
+        if bodyParts[channel].isFound():
+            # still there, so remove it
+            bodyParts[channel].tagRemoved(True)
+            
+            numPartsFound = numPartsFound - 1
+        
+    print('numPartsFound = ', numPartsFound)
     
 def init():
     """System level initialization.
@@ -172,6 +202,10 @@ def configZombie():
             name = str(row['name'])
             pin = int(row['pin'])
             
+            # set up the GPIO pin as input with callback
+            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            GPIO.add_event_detect(pin, GPIO.BOTH, callback=bodyPart_callback)
+            
             # parse the tag to get a byte array
             tag = array.array('B', [int(x) for x in row['tag'].split(' ')])
             
@@ -222,9 +256,10 @@ def configZombie():
             # create this body part
             part = body_part.BodyPart(name, pin, magnets, tag, soundfile)
             
-            # add to list of body parts
-            bodyParts.append(part)
+            # add to dict of body parts
+            bodyParts[pin] = part
             
+    print('len = ', len(bodyParts))
     print('Initialized')
     
     
@@ -232,6 +267,7 @@ def main():
     global state
     global bodyParts
     global restartTimer
+    global numPartsFound
     
     init()
     
@@ -257,16 +293,17 @@ def main():
                 state = ZombieState.LOCKED
                 
             elif state == ZombieState.LOCKED:
-                # assume we've found all the parts
-                allFound = True
-        
-                # update all the parts and see if we've found all of them
-                for part in bodyParts:
-                    allFound &= part.update()
+                # idiot check on number of parts
+                if numPartsFound < 0:
+                    print('numPartsFound = ', numPartsFound)
+                    numPartsFound = 0
                 
-                # are  they all there?
-                if allFound:
+                # have we found everything?
+                if numPartsFound >= len(bodyParts):
+                    print('Found them all')
                     state = ZombieState.FOUND_ALL
+                else:
+                    time.sleep(1.0)
                     
             elif state == ZombieState.FOUND_ALL:
                 print("Found all parts")
@@ -285,7 +322,7 @@ def main():
                 print("Turning off magnets")
                 
                 # drop all  the parts
-                for part in  bodyParts:
+                for part in  bodyParts.values():
                    part.drop()
                    time.sleep(1.0)
                    

@@ -42,15 +42,17 @@ class BodyPart(object):
         self.sound = mixer.Sound(soundfile)
         self.sound.set_volume(1.0)
 
-        # set up the pin as an input
-        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-        
         # turn off motor and reader at close
         atexit.register(self.close)
 
         # update  the web server
         payload = {'name' :  self.name, 'status' : 0}
         config.session.post('http://127.0.0.1/insert', data=payload)
+        
+    def isFound(self):
+        """Getter for the current state"""
+        
+        return self.state == BodyPartState.TAG_FOUND
         
     def close(self):
         """Turn off the magnets """
@@ -65,10 +67,17 @@ class BodyPart(object):
     def foundMyTag(self):
         """Turn on the magnets and play a sound
         """
-        # turn on the magnets
+        # turn on the magnets full blast
+        for m in self.magnets:
+            m.setSpeed(200)
+            m.run(Adafruit_MotorHAT.FORWARD)
+                    
+        # wait a bit
+        time.sleep(0.1)
+        
+        # turn down the magnets
         for m in self.magnets:
             m.setSpeed(180)
-            m.run(Adafruit_MotorHAT.FORWARD)
                     
         # play a sound
         print(self.name, ' found')
@@ -103,35 +112,6 @@ class BodyPart(object):
         # update state
         self.state = BodyPartState.IDLE
         
-    def update(self):
-        """Update the finite state machine to handle tags and the magnet
-        Returns boolean flag indicating if tag has been found
-        """
-        
-        if self.state == BodyPartState.IDLE:
-            # did we get a tag? 
-            if GPIO.input(self.pin):
-                # we found it!
-                self.foundMyTag()
-                                   
-            else:
-                # tag is gone, don't do anything
-                pass
-                
-        elif self.state == BodyPartState.TAG_FOUND:
-            # make sure tag is still there
-            if not GPIO.input(self.pin):
-                # turn off the magnets
-                self.tagRemoved(True)
-                    
-            else:
-                pass
-                
-        else:
-            # invalid state
-            pass
-            
-        return self.state == BodyPartState.TAG_FOUND
     
     def drop(self):
         # drop the body part
