@@ -14,7 +14,6 @@ import supervisor
 from adafruit_pn532.i2c import PN532_I2C
 
 try:
-    
     # onboard LED
     led = digitalio.DigitalInOut(board.D13)
     led.direction = digitalio.Direction.OUTPUT
@@ -22,14 +21,15 @@ try:
     # connection  to RPi
     pin = digitalio.DigitalInOut(board.D4)
     pin.direction = digitalio.Direction.OUTPUT
-
+    pin.value = False        # no tag yet
+    
     # NFC tag we're looking for
-    # tag = bytes([167, 75, 126, 242])      # head
+    tag = bytes([167, 75, 126, 242])      # head
     # tag = bytes([151, 207, 126, 242])       # right leg
     # tag = bytes([7, 76, 126, 242])        # left leg
     # tag = bytes([55, 167, 128, 242])      # right arm
     # tag = bytes([71, 208, 126, 242])      # left arm
-    tag = bytes([231, 206, 126, 242])     # chest
+    # tag = bytes([231, 206, 126, 242])     # chest
     extra_tag = bytes([247, 71, 128, 242])  # spare tag for testing
 
     # I2C connection:
@@ -63,6 +63,6 @@ try:
         else:
             led.value = False
             pin.value = False
-
+            
 except Exception:
     supervisor.reload()
