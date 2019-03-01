@@ -87,8 +87,7 @@ def bodyPart_callback(channel):
     channel = GPIO channel
     """
     global numPartsFound
-    
-    print('body part ', channel)
+    global bodyParts
     
     # found or removed?
     if GPIO.input(channel):
@@ -106,8 +105,6 @@ def bodyPart_callback(channel):
             
             numPartsFound = numPartsFound - 1
         
-    print('numPartsFound = ', numPartsFound)
-    
 def init():
     """System level initialization.
         - create the directory /tmp/zombie
@@ -143,7 +140,7 @@ def init():
     config.magnetTimer = Timer(7200.0, magnetTimer_callback)
     
     # clear the web database
-    config.session.get('http://127.0.0.1/init')
+    config.session.get('http://localhost/init')
     
 
     
@@ -160,7 +157,7 @@ def wakeup():
     GPIO.setup(resetPin1, GPIO.OUT)
     GPIO.setup(resetPin2, GPIO.OUT)
     
-    # set reset signals low
+    # set reset signals low (active low reset)
     GPIO.output(resetPin1, GPIO.LOW)
     GPIO.output(resetPin2, GPIO.LOW)
     
@@ -174,12 +171,14 @@ def wakeup():
     # wait another bit
     time.sleep(0.25)
     
-    # set the pins to inputs with a pull-up
-    GPIO.setup(resetPin1, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    GPIO.setup(resetPin2, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    # cleanup the pins
+    GPIO.cleanup( [resetPin1, resetPin2] )
     
     # initialize sound device
     mixer.init()
+    
+    # wait a little for things to settle
+    time.sleep(3.0)
     
 def configZombie():
     """Read the config file and build the different body parts
@@ -201,6 +200,12 @@ def configZombie():
         for row in reader:            
             name = str(row['name'])
             pin = int(row['pin'])
+            
+            # release the GPIO poin if we were already using it
+            try:
+                GPIO.remove_event_detect(pin)
+            except RuntimeError:
+                pass
             
             # set up the GPIO pin as input with callback
             GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -252,14 +257,14 @@ def configZombie():
                 
                 # add to list of magnets for this body part
                 magnets.append(magnet2)
-                                
+            
             # create this body part
             part = body_part.BodyPart(name, pin, magnets, tag, soundfile)
             
             # add to dict of body parts
             bodyParts[pin] = part
-            
-    print('len = ', len(bodyParts))
+
+
     print('Initialized')
     
     
@@ -290,6 +295,7 @@ def main():
                 
                 # start looking for body parts
                 print("Waiting for body parts")
+                numPartsFound = 0
                 state = ZombieState.LOCKED
                 
             elif state == ZombieState.LOCKED:
@@ -341,7 +347,7 @@ def main():
                 # start the timer to reset the prop
                 restartTimer = Timer(300.0, restartTimer_callback)
                 restartTimer.start()
-                
+                 
                 # wait until reset
                 state = ZombieState.PAUSE
                 
@@ -352,6 +358,9 @@ def main():
                 # unknown state, so reset
                 state = ZombieState.RESET
                 
+    except KeyboardInterrupt:
+        pass
+    
     finally:
         # clean everything up
         print("Exiting, cleaning up")
@@ -365,8 +374,6 @@ def main():
         
         
         
- 
-#    nfc_scanner(busAddr, muxAddr, queues)
 if __name__ == '__main__':
     main()
 

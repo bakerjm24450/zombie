@@ -31,7 +31,11 @@
                 {% for part in parts %}
                 <tr>
                     <td>{{ part['name'] }}</td>
-                    <td>{{ part['status'] }}</td>
+                    {% if part['status'] == -1 %}
+                        <td>ERROR</td>
+                    {% else %}
+                        <td>{{ part['status'] }}</td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </table>

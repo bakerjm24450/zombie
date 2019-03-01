@@ -47,13 +47,13 @@ class BodyPart(object):
 
         # update  the web server
         payload = {'name' :  self.name, 'status' : 0}
-        config.session.post('http://127.0.0.1/insert', data=payload)
+        config.session.post('http://localhost/insert', data=payload)
         
     def isFound(self):
         """Getter for the current state"""
         
         return self.state == BodyPartState.TAG_FOUND
-        
+    
     def close(self):
         """Turn off the magnets """
         for m in self.magnets:
@@ -61,7 +61,7 @@ class BodyPart(object):
             
         # update web page
         payload = {'name' :  self.name, 'status' : 0}
-        config.session.post('http://127.0.0.1/update', data=payload)
+        config.session.post('http://localhost/update', data=payload)
         
             
     def foundMyTag(self):
@@ -69,7 +69,7 @@ class BodyPart(object):
         """
         # turn on the magnets full blast
         for m in self.magnets:
-            m.setSpeed(200)
+            m.setSpeed(250)
             m.run(Adafruit_MotorHAT.FORWARD)
                     
         # wait a bit
@@ -85,7 +85,7 @@ class BodyPart(object):
         
         # update  the web server
         payload = {'name' :  self.name, 'status' : 1}
-        config.session.post('http://127.0.0.1/update', data=payload)
+        config.session.post('http://localhost/update', data=payload)
         
         # start the timer if it's not already running
         if not config.magnetTimer.is_alive():
@@ -99,15 +99,15 @@ class BodyPart(object):
         """Turn off magnets and play a sound
         """
         
-        for m in self.magnets:
-            m.run(Adafruit_MotorHAT.RELEASE)
-            
+        # drop the part
+        self.drop()
+        
         if playSound == True:
             print(self.name, ' tag removed')
         
         # update  the web server
         payload = {'name' :  self.name, 'status' : 0}
-        config.session.post('http://127.0.0.1/update', data=payload)
+        config.session.post('http://localhost/update', data=payload)
         
         # update state
         self.state = BodyPartState.IDLE
@@ -115,7 +115,9 @@ class BodyPart(object):
     
     def drop(self):
         # drop the body part
-        self.tagRemoved()
+        for m in self.magnets:
+            m.run(Adafruit_MotorHAT.RELEASE)
+            
 
 
         
