@@ -7,7 +7,7 @@
 #define BOX_DEBUG
 
 #include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>   // Include the WebServer library
+#include <ESP8266HTTPClient.h>
 #include <ArduinoOTA.h>
 #include <EEPROM.h>
 #include "MQTT.h"
@@ -28,7 +28,7 @@ const char passwd[] = "IDx1bEp9qgInIzvJ";
 
 // OTA config
 const char OTAName[] = "UH_Zombie_Box";         // A name and a password for the OTA service
-const char OTAPassword[] = "Z97j865Ftnw%cAW#hRD2";
+const char OTAPassword[] = "";
 
 // standard MQTT setup
 const unsigned int mqttPort = 1883;
@@ -36,9 +36,15 @@ const char brokerIpAddr[] = "192.168.1.10";
 MQTT mqtt("ZombieBox", brokerIpAddr, mqttPort);
 bool connectedToBroker = false;
 
-// status of the maglock
-bool maglockLocked = false;
+// web server
+const char webserverIpAddr[] = "192.168.1.10";
+const int webserverPort = 80;
 
+// status of the maglock
+int maglockLocked = 0;
+
+// whether to send web update
+bool sendWebUpdate = false;
 
 //*************************************************************************
 // Function prototypes
@@ -53,6 +59,9 @@ void unlockBox();
 void myCallback(uint32_t *client, const char* topic, uint32_t topicLen,
                    const char *data, uint32_t dataLen);
 
+// talk to web server
+void initWebStatus(int status);
+void updateWebStatus(int status);
 
 //********************************************************************************
 // Initialize the system. Set up all the servers and initialize the relay
@@ -79,6 +88,9 @@ void setup()
   setupMqtt();
   connectMqtt();
 
+  // send initial status to web server
+  initWebStatus(maglockLocked);
+  
   // lock the box initially
   lockBox();
 
@@ -93,6 +105,13 @@ void loop(void) {
   // check for OTA updates
   ArduinoOTA.handle();
 
+  // update the web page?
+  if (sendWebUpdate) {
+    sendWebUpdate = false;
+
+    updateWebStatus(maglockLocked);  
+  }
+  
   // wait a little bit
   delay(10);
 }
@@ -367,6 +386,10 @@ void unlockBox()
   digitalWrite(MAGLOCK, OFF);
 
   digitalWrite(LED, HIGH);        // turn LED off too for diagnostics
+
+  // update status on web server
+  maglockLocked = 0;
+  sendWebUpdate = true;
 }
 
 //************************************************************************
@@ -378,6 +401,45 @@ void lockBox()
   digitalWrite(MAGLOCK, ON);
 
   digitalWrite(LED, LOW);        // turn LED on too for diagnostics
+
+  // update status on web server
+  maglockLocked = 1;
+  sendWebUpdate = true;
 }
 
+//*****************************************
+// Initialize status on web page
+//*****************************************
+void initWebStatus(int status)
+{
+  WiFiClient client;
+  HTTPClient http;
+  String postData = "lockname=Box&status=" + String(status);
+  Serial.println("Init: " + postData);
+
+  http.begin(client, "http://192.168.1.10/initlock");
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  int result = http.POST(postData);
+  http.writeToStream(&Serial);
+  http.end();
+}
+
+//*****************************************
+// Update status on web page
+//*****************************************
+void updateWebStatus(int status)
+{
+  WiFiClient client;
+  HTTPClient http;
+  String postData = "lockname=Box&status=" + String(status);
+  Serial.println("Update: " + postData);
+
+  http.begin(client, "http://192.168.1.10/updatelock");
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+  int result = http.POST(postData);
+  http.writeToStream(&Serial);
+  http.end();
+}
 
