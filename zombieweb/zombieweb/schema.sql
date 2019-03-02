@@ -16,6 +16,7 @@ CREATE TABLE bodyparts (
 
 CREATE TABLE lockstatus (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
     status INTEGER
 );
 

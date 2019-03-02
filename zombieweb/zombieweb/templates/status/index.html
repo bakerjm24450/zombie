@@ -7,6 +7,17 @@
 {% block content %}
     <div class="w3-row-padding">
         <div class="w3-col w3-container l3 m3 s12 w3-center">
+            <table class="w3-table-all">
+                <tr>
+                    <td>{{ lockstatus['name'] }} Status:</td>
+                    {% if lockstatus['status'] == 0 %}
+                        <td>UNLOCKED</td>
+                    {% else %}
+                        <td>LOCKED</td>
+                    {% endif %}
+                 </tr>
+            </table>
+                
              <form action="/unlock" method="post">
                 <p>
                     <button type="submit" class="w3-button w3-round w3-pale-green w3-border w3-border-green w3-hover-green">

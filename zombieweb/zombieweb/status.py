@@ -18,7 +18,7 @@ def index():
         ' ORDER BY name'
     ).fetchall()
     lockstatus = db.execute(
-        'SELECT id, status'
+        'SELECT id, name, status'
         ' FROM lockstatus'
     ).fetchone()
     
@@ -59,6 +59,34 @@ def update():
     db = get_db()
     db.execute(
         'UPDATE bodyparts SET status = ?'
+        ' WHERE name = ?',
+        (status, name)
+    )
+    db.commit()
+    return 'OK'
+
+@bp.route('/initlock', methods=('POST',))
+def initlock():
+    name = request.form['lockname']
+    status = request.form['status']
+    
+    db = get_db()
+    db.execute(
+        'REPLACE INTO lockstatus (name, status)'
+        ' VALUES (?, ?)',
+        (name, status)
+    )
+    db.commit()
+    return 'OK'
+    
+@bp.route('/updatelock', methods=('POST',))
+def updatelock():
+    name = request.form['lockname']
+    status = request.form['status']
+    
+    db = get_db()
+    db.execute(
+        'UPDATE lockstatus SET status = ?'
         ' WHERE name = ?',
         (status, name)
     )
