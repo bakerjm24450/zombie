@@ -345,7 +345,7 @@ def main():
                 config.magnetTimer = Timer(7200.0, magnetTimer_callback)
                 
                 # start the timer to reset the prop
-                restartTimer = Timer(300.0, restartTimer_callback)
+                restartTimer = Timer(1800.0, restartTimer_callback)
                 restartTimer.start()
                  
                 # wait until reset
