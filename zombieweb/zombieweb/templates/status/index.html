@@ -9,16 +9,16 @@
         <div class="w3-col w3-container l3 m3 s12 w3-center">
             <table class="w3-table-all">
                 <tr>
-                    <td>{{ lockstatus['name'] }} Status:</td>
-                    {% if lockstatus['status'] == 0 %}
+                    <td>{{ boxstatus['name'] }} Status:</td>
+                    {% if boxstatus['status'] == 0 %}
                         <td>UNLOCKED</td>
                     {% else %}
                         <td>LOCKED</td>
                     {% endif %}
-                 </tr>
+                </tr>
             </table>
                 
-             <form action="/unlock" method="post">
+            <form action="/unlock" method="post">
                 <p>
                     <button type="submit" class="w3-button w3-round w3-pale-green w3-border w3-border-green w3-hover-green">
                     Unlock
@@ -32,6 +32,40 @@
                     </button>
                 </p>
             </form>
+                
+            <table class="w3-table-all">
+                <tr>
+                    <td>{{ casketstatus['name'] }} Status:</td>
+                    {% if casketstatus['status'] == 0 %}
+                        <td>CLOSED</td>
+                    {% else %}
+                        <td>OPEN</td>
+                    {% endif %}
+                </tr>
+            </table>
+                
+            <form action="/closecasketdelay" method="post">
+                <p>
+                    <button type="submit" class="w3-button w3-round w3-pale-red w3-border w3-border-red w3-hover-red">
+                    Close Casket after Delay
+                    </button>
+                </p>
+            </form>
+            <form action="/closecasket" method="post">
+                <p>
+                    <button type="submit" class="w3-button w3-round w3-pale-red w3-border w3-border-red w3-hover-red">
+                    Close Casket Immediately
+                    </button>
+                </p>
+            </form>
+            <form action="/opencasket" method="post">
+                <p>
+                    <button type="submit" class="w3-button w3-round w3-pale-green w3-border w3-border-green w3-hover-green">
+                    Open Casket
+                    </button>
+                </p>
+            </form>
+                
         </div>
         <div class="w3-col w3-container l6 m6 s12">
             <table class="w3-table-all">
@@ -50,6 +84,26 @@
                 </tr>
                 {% endfor %}
             </table>
+
+            <table class="w3-table-all">
+                <tr>
+                    <th>Candle</th>
+                    <th>Color</th>
+                    <th>Status</th>
+                </tr>
+                {% for candle in candles %}
+                <tr>
+                    <td>{{ candle['name'] }}</td>
+                    <td>{{ candle['color'] }}</td>
+                    {% if candle['status'] == -1 %}
+                        <td>ERROR</td>
+                    {% else %}
+                        <td>{{ candle['status'] }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </table>
+
         </div>
     </div>
 {% endblock %}

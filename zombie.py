@@ -97,13 +97,13 @@ def bodyPart_callback(channel):
         
             numPartsFound = numPartsFound + 1
         
-    else:
-        # falling edge, so check if we already removed this one
-        if bodyParts[channel].isFound():
-            # still there, so remove it
-            bodyParts[channel].tagRemoved(True)
-            
-            numPartsFound = numPartsFound - 1
+#    else:
+#        # falling edge, so check if we already removed this one
+#        if bodyParts[channel].isFound():
+#            # still there, so remove it
+#            bodyParts[channel].tagRemoved(True)
+#            
+#            numPartsFound = numPartsFound - 1
         
 def init():
     """System level initialization.

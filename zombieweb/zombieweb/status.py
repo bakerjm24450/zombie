@@ -17,12 +17,25 @@ def index():
         ' FROM bodyparts'
         ' ORDER BY name'
     ).fetchall()
-    lockstatus = db.execute(
+    boxstatus = db.execute(
         'SELECT id, name, status'
         ' FROM lockstatus'
+        ' WHERE name = "Box"'
     ).fetchone()
+    casketstatus = db.execute(
+        'SELECT id, name, status'
+        ' FROM lockstatus'
+        ' WHERE name = "Casket"'
+    ).fetchone()
+    candles = db.execute(
+        'SELECT id, name, color, status'
+        ' FROM candles'
+        ' ORDER BY name'
+    ).fetchall()
+        
     
-    return render_template('status/index.html', parts=parts, lockstatus=lockstatus)
+    return render_template('status/index.html', parts=parts, boxstatus=boxstatus,
+                           casketstatus=casketstatus, candles=candles)
 
 @bp.route('/unlock', methods=('POST',))
 def unlock():
@@ -92,7 +105,56 @@ def updatelock():
     )
     db.commit()
     return 'OK'
+
+@bp.route('/insertcandle', methods=('POST',))
+def insertcandle():
+    name = request.form['name']
+    status = request.form['status']
+    color = request.form['color']
     
+    db = get_db()
+    db.execute(
+        'REPLACE INTO candles (name, color, status)'
+        ' VALUES (?, ?, ?)',
+        (name, color, status)
+    )
+    db.commit()
+    return 'OK'
+
+@bp.route('/updatecandle', methods=('POST',))
+def updatecandle():
+    name = request.form['name']
+    status = request.form['status']
+    color = request.form['color']
+        
+    db = get_db()
+    db.execute(
+        'UPDATE candles SET color = ?, status = ?'
+        ' WHERE name = ?',
+        (color, status, name)
+    )
+    db.commit()
+    return 'OK'
+
+@bp.route('/closecasket', methods=('POST',))
+def closecasket():
+    # send a msg to the casket
+    publish.single(topic="/casket/command", payload="close", hostname="localhost")
+    return redirect(url_for('index'))
+
+@bp.route('/opencasket', methods=('POST',))
+def opencasket():
+    # send a msg to the casket
+    publish.single(topic="/casket/command", payload="open", hostname="localhost")
+    return redirect(url_for('index'))
+
+@bp.route('/closecasketdelay', methods=('POST',))
+def opencasketdelay():
+    # send a msg to the casket
+    publish.single(topic="/casket/command", payload="closedelay", hostname="localhost")
+    return redirect(url_for('index'))
+
+
 @bp.route('/init', methods=('GET', 'POST'))
 def init():
     init_db()
